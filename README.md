@@ -2,6 +2,8 @@
 
 Portal corporativo interno com autenticação LDAP/AD, gestão de documentos, avisos e indicadores.
 
+> **Nota:** este repositório é uma versão de portfólio. Todos os nomes, e-mails, senhas de demonstração e conteúdo institucional são **100% fictícios** — nenhuma informação real de funcionários ou da empresa original está incluída.
+
 ## Arquitetura
 
 ```

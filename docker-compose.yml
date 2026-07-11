@@ -1,0 +1,81 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: intranet_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-intranet_demo}
+      POSTGRES_USER: ${DB_USER:-intranet}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no seu .env}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/migrations/001_schema.sql:/docker-entrypoint-initdb.d/001_schema.sql
+      - ./backend/migrations/002_seed.sql:/docker-entrypoint-initdb.d/002_seed.sql
+      - ./backend/migrations/003_cms_tables.sql:/docker-entrypoint-initdb.d/003_cms_tables.sql
+      - ./backend/migrations/004_directory.sql:/docker-entrypoint-initdb.d/004_directory.sql
+      - ./backend/migrations/005_shortcut_icons_and_public_docs_fix.sql:/docker-entrypoint-initdb.d/005_shortcut_icons_and_public_docs_fix.sql
+      - ./backend/migrations/006_mission.sql:/docker-entrypoint-initdb.d/006_mission.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-intranet} -d ${DB_NAME:-intranet_demo}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: intranet_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-intranet_demo}
+      DB_USER: ${DB_USER:-intranet}
+      DB_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no seu .env}
+
+      SESSION_SECRET: ${SESSION_SECRET:?defina SESSION_SECRET no seu .env}
+
+      LDAP_ENABLED: ${LDAP_ENABLED:-true}
+      LDAP_URL: ${LDAP_URL:-ldap://ldap.exemplo.local:389}
+      LDAP_BASE_DN: ${LDAP_BASE_DN:-DC=exemplo,DC=local}
+      LDAP_BIND_DN: ${LDAP_BIND_DN:-}
+      LDAP_BIND_PASSWORD: ${LDAP_BIND_PASSWORD:-}
+      LDAP_DOMAIN: ${LDAP_DOMAIN:-exemplo.local}
+      LDAP_NETBIOS: ${LDAP_NETBIOS:-EXEMPLO}
+      LDAP_NETBIOS_DOMAIN: ${LDAP_NETBIOS_DOMAIN:-EXEMPLO}
+
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - uploads:/app/uploads
+    ports:
+      - "${API_PORT:-3000}:3000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ""
+        VITE_INTRANET_URL: "${VITE_INTRANET_URL:-http://intranet.exemplo.local}"
+        VITE_PORTAL_URL: "${VITE_PORTAL_URL:-http://localhost:8080}"
+    container_name: intranet_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-8082}:80"
+
+volumes:
+  pgdata:
+    driver: local
+  uploads:
+    driver: local
